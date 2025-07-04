@@ -4,7 +4,6 @@ from typing import List
 
 from heliuspy import HeliusAPI
 from solana.rpc.api import Client
-from solders.keypair import Keypair
 
 from spl_seller.modules.token_charts import TokenCharts
 from spl_seller.types.exit_strategy import ExitStrategy
@@ -16,8 +15,8 @@ logger = get_logger()
 
 
 class Wallet:
-    def __init__(self, wallet_info: List[WalletInfo], HELIUS_API_KEY: str, BIRDEYE_API_TOKEN: str):
-        self.wallets = wallet_info
+    def __init__(self, wallets: List[WalletInfo], HELIUS_API_KEY: str, BIRDEYE_API_TOKEN: str):
+        self.wallets = wallets
         # Configuration
         self.RPC_ENDPOINT = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
         self.BIRDEYE_API_TOKEN = BIRDEYE_API_TOKEN
@@ -79,6 +78,27 @@ class Wallet:
             "7hBvn2dnqBoHYCh2vp7js3zaPSf6px2s4HMiPzw1pump",
             "3MnqzEH6JrWeHL1MmZPSr81i9Tto7mbuctH5Hvv1pump",
             "8Pg897t8NFe9sxGWsnAfnxP6NPu1ACUsgedSBacHpump",
+            "CbSMDtN92mb94MX79inZu6Am3vcpeaZhKaXjbLUERWbC",
+            "3bjiVrsRuRGq4XsFighja49fVvKzYEFF56vgubWAtmgM",
+            "51gUsfAzZya3dM99eoEPkEHGftsrJ5ZfiyThWjpQPXts",
+            "ErNpMq1bAQ5KwWqYjTA7hS14rGnKmRXcJv8ELqF9XjHU",
+            "3WRs7aZ71bhzuLkNyVaNAU2DcbwUMqAjNUJ36uPdyDwW",
+            "F5DZXcSjUzUsyCX1fSYUg3z2TfARFdDh2UhJS7BPw4mD",
+            "8sgJmj2NSwKMDCFhtmeZFMRRsSamGz5fqQq7WcnLWWe",
+            "3DB5npeJFBdthMpGxJzAcc54FsZGdpGMqYrLo9czmqCs",
+            "4mhJH8GKWQJSDQtZ3qNb7c3cxk2uraG3KtZGnYHL3xFf",
+            "AyJyrQrK1AjUgDUsQ3hbhuaZCN9nFP37wFPyrfao8VLP",
+            "EDzaWCnQC5hmGjaBPgPAydj15qY9fvNxJFmArJAvVMvg",
+            "GEq9fT7FMdZN5rvyR7VCESgTzSsPvDJBxSNHP4sAyW32",
+            "2uw4LxAQsmFqbR56GCFo8gDp5LpDEu2zj7TCEEbJdy23",
+            "9X23ybhJuowjq84aNp1vCS9zaLKTVWaoYYMLTS6S1pgA",
+            "avkH1mHTREWEaRDvZqTjxCpCwdcXjN11NgCsqo56hXp",
+            "EJtocH3iHD415RE24HTgih2m6MtcbYgbPkjFQUuqxp3N",
+            "8NmmjvHCczazUHBGpmQVJWDM64iY5TpKDLsz8bRssxZF",
+            "8wbxL9uAmniSENBv44ktN9qn4ZFGt27XwJ9RbqkG8pVV",
+            "CTzG6CExynq52vHdnAcB7LtHuYuyVbnRNkoKFM1mgxFJ",
+            "EDzaWCnQC5hmGjaBPgPAydj15qY9fvNxJFmArJAvVMvg",
+            "BLqjgc4ebMK3qZXR3xosog517G22NDMcGxnmWwdXEDKJ",
         ]
         try:
             token_accounts = self.Helius.get_token_accounts(
@@ -161,14 +181,50 @@ class Wallet:
         for token in tokens_to_update:
             self.populate_holding_token(token=token)
 
-        # Update all prices
-        if len(tokens_to_update) > 0:
-            logger.info("Updating current price for {a} tokens".format(a=len(self.holdings)))
+        self.update_prices()
 
-        mints = list(set([x.mint for x in self.holdings]))
-        quotes = self.TokenChart.get_quotes(mints=mints)
+    def update_prices(self):
         quote_time = datetime.now(timezone.utc)
+        mints_to_quote = list()
+        quotes_to_get_symbols = list()
+        for each in self.holdings:
+            if (
+                each.current_price_per_token_usd is None
+                or each.current_price_time is None
+                or each.current_price_per_token_sol is None
+                or each.percent_from_sell is None
+            ):
+                mints_to_quote.append(each.mint)
+                quotes_to_get_symbols.append(each.symbol)
+                continue
+            time_diff = quote_time - each.current_price_time
+            if time_diff > timedelta(seconds=10) and each.percent_from_sell <= 0.2:
+                mints_to_quote.append(each.mint)
+                quotes_to_get_symbols.append(each.symbol)
+            elif time_diff > timedelta(seconds=30) and each.percent_from_sell <= 0.3:
+                mints_to_quote.append(each.mint)
+                quotes_to_get_symbols.append(each.symbol)
+            elif time_diff > timedelta(seconds=60) and each.percent_from_sell <= 0.4:
+                mints_to_quote.append(each.mint)
+                quotes_to_get_symbols.append(each.symbol)
+            elif time_diff > timedelta(seconds=180) and each.percent_from_sell <= 0.5:
+                mints_to_quote.append(each.mint)
+                quotes_to_get_symbols.append(each.symbol)
+            elif time_diff > timedelta(seconds=300):
+                mints_to_quote.append(each.mint)
+                quotes_to_get_symbols.append(each.symbol)
+
+        mints_to_quote = list(set(mints_to_quote))
+        logger.info("Quotes to get: {s}".format(s=quotes_to_get_symbols))
+        quotes = self.TokenChart.get_quotes(mints=mints_to_quote, liquidity=100000)
+        if len(quotes) < len(mints_to_quote):
+            new_mints = [x for x in mints_to_quote if x not in quotes]
+            quotes_less_liquidity = self.TokenChart.get_quotes(mints=new_mints, liquidity=40000)
+            quotes.update(quotes_less_liquidity)
+
         for token in self.holdings:
+            if token.mint not in mints_to_quote:
+                continue
             # Update time held
             quote_values = quotes.get(token.mint)
             if quote_values is None:
@@ -178,7 +234,6 @@ class Wallet:
                 continue
 
             token.buy_duration_hours = int((quote_time - token.buy_time).total_seconds() / 60.0 / 60.0)
-
             token.current_price_per_token_sol = quote_values["current_price_per_token_sol"]
             token.current_price_per_token_usd = quote_values["current_price_per_token_usd"]
 
@@ -187,23 +242,29 @@ class Wallet:
 
             token.current_value_sol = token.current_price_per_token_sol * token.current_amount
             token.current_price_time = quote_time
+            token = self._populate_exit_data(token=token)
 
     def _populate_exit_data(self, token: HoldingData) -> HoldingData:
-        """
-        """
-        pass
-    
-    def _get_exit_strategy(self, wallet: WalletInfo, percent_remaining: float) -> ExitStrategy:
-        for strat in wallet.exit_strategy:
-            if strat["amount_remaining_percent_lte"] >= percent_remaining > strat["amount_remaining_percent_gt"]:
-                return ExitStrategy(
-                    amount_remaining_percent_gt=strat["amount_remaining_percent_gt"],
-                    amount_remaining_percent_lte=strat["amount_remaining_percent_lte"],
-                    stop_price_per_token_percent_change=strat["stop_price_per_token_percent_change"],
-                    profit_price_per_token_percent_change=strat["profit_price_per_token_percent_change"],
-                    profit_sell_amount_percent=strat["profit_sell_amount_percent"],
-                )
-        return None            
+        """ """
+        if not token.current_price_per_token_usd or not token.current_price_per_token_sol:
+            logger.info("Quote not found for token: {t}".format(t=token))
+            return token
+
+        if not token.exit_strategy:
+            logger.info("Exit Strategy is None")
+            return token
+
+        away_from_profit = (token.profit_price_per_token / token.current_price_per_token_usd) - 1.0
+        away_from_sell = 1.0 - (token.stop_price_usd / token.current_price_per_token_usd)
+
+        token.percent_from_sell = round(min(away_from_profit, away_from_sell), 4)
+        return token
+
+    def _get_exit_strategy(self, wallet_exit_strategies: List[ExitStrategy], percent_remaining: float) -> ExitStrategy:
+        for strat in wallet_exit_strategies:
+            if strat.amount_remaining_percent_lte >= percent_remaining > strat.amount_remaining_percent_gt:
+                return strat
+        return None
 
     def get_holdings_token_from_list(self, mint, pub_key) -> HoldingData:
         for x in self.holdings:
@@ -236,6 +297,24 @@ class Wallet:
         ):
             logger.info("Sell percents are off for token: {t}".format(t=token))
             return token
+
+        exit_strategies = [x.exit_strategy for x in self.wallets if x.public_key == token.public_key][0]
+        token.exit_strategy = self._get_exit_strategy(
+            wallet_exit_strategies=exit_strategies, percent_remaining=token.sell_percent_remaining
+        )
+
+        token.stop_price_usd = (
+            1 + token.exit_strategy.stop_price_per_token_percent_change
+        ) * token.buy_price_per_token_usd
+
+        original_buy_amount = int(token.current_amount_raw / token.sell_percent_remaining)
+        token.profit_sell_amount = min(
+            int(original_buy_amount * token.exit_strategy.profit_sell_amount_percent) - 1, token.current_amount_raw
+        )
+
+        token.profit_price_per_token = (
+            1 + token.exit_strategy.profit_price_per_token_percent_change
+        ) * token.buy_price_per_token_usd
 
         self.holdings.append(token)
         return token
@@ -401,10 +480,16 @@ class Wallet:
         return False
 
     def _print_holdings(self):
-        logger.info("-------------------------------")
+        current_time = datetime.now(timezone.utc)
         for token in self.holdings:
-            logger.info(token)
-        logger.info("-------------------------------")
+            if not token.last_print_time:
+                logger.info(token)
+                token.last_print_time = current_time
+                continue
+            time_diff = current_time - token.last_print_time
+            if time_diff > timedelta(seconds=60):
+                logger.info(token)
+                token.last_print_time = current_time
 
 
 if __name__ == "__main__":

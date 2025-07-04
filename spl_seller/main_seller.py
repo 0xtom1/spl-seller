@@ -3,12 +3,11 @@ import os
 import socketserver
 import threading
 import time
-from datetime import datetime, timezone
-from typing import List
+
+from solders.keypair import Keypair
 
 from spl_seller.modules.swap import Swapper
 from spl_seller.modules.wallet_info import Wallet
-from spl_seller.types.exit_strategy import ExitStrategy
 from spl_seller.types.holdings_data import HoldingData
 from spl_seller.utils.log import get_logger
 from spl_seller.utils.settings import settings_key_values
@@ -20,71 +19,41 @@ class SplSeller:
     def __init__(self):
         try:
             self.BIRDEYE_API_TOKEN = settings_key_values["BIRDEYE_API_TOKEN"]
-            self.SOLANA_PRIVATE_KEY = settings_key_values["SOLANA_PRIVATE_KEY"]
+            self.wallets = settings_key_values["wallets"]
             self.HELIUS_API_KEY = settings_key_values["HELIUS_API_KEY"]
 
         except KeyError:
             raise ValueError("Environment variable is required but not set")
 
         self.WalletInterface = Wallet(
-            WALLET_PRIVATE_KEY=self.SOLANA_PRIVATE_KEY,
+            wallets=self.wallets,
             HELIUS_API_KEY=self.HELIUS_API_KEY,
             BIRDEYE_API_TOKEN=self.BIRDEYE_API_TOKEN,
         )
 
-
-        self.SwapInterface = Swapper(WALLET_PRIVATE_KEY=self.SOLANA_PRIVATE_KEY, HELIUS_API_KEY=self.HELIUS_API_KEY)
+        self.SwapInterface = Swapper(HELIUS_API_KEY=self.HELIUS_API_KEY)
         self.prices_list = list()
+        for each in self.wallets:
+            balance = self.SwapInterface.get_balance_with_retry(pubkey=each.key_pair.pubkey()) / 1e9
+            logger.info(f"Wallet {each.public_key} balance: {balance} SOL")
 
     def run(self):
         logger.info("----------------------------Starting Run----------------------------")
         self.WalletInterface.update_holdings()
-
+        self.WalletInterface._print_holdings()
         holdings = self.WalletInterface.holdings
 
         for token in holdings:
-            if not token.current_price_per_token_usd or not token.current_price_per_token_sol:
-                logger.info("Quote not found for token: {t}".format(t=token))
-                continue
-            exit_strategy = self._get_exit_strategy(percent_remaining=token.sell_percent_remaining)
-            if not exit_strategy:
-                logger.info("Exit Strategy is None")
-
-            token.stop_price_usd = max(
-                (1 + exit_strategy.stop_price_per_token_percent_change) * token.buy_price_per_token_usd,
-                token.initial_stop_price_usd,
-            )
-
-            logger.info(token)
-            logger.info(exit_strategy)
-
-            original_buy_amount = int(token.current_amount_raw / token.sell_percent_remaining)
-            logger.info("Original Buy Amount: {t}".format(t=original_buy_amount))
-
-            profit_sell_amount = min(
-                int(original_buy_amount * exit_strategy.profit_sell_amount_percent) - 1, token.current_amount_raw
-            )
-            logger.info("Profit Sell Amount: {t}".format(t=profit_sell_amount))
-
-            profit_price_per_token = (
-                1 + exit_strategy.profit_price_per_token_percent_change
-            ) * token.buy_price_per_token_usd
-
-            logger.info("Profit Price per token: {t}".format(t=profit_price_per_token))
-
             if token.current_price_per_token_usd <= token.stop_price_usd:
                 logger.info("***Below stop price, sell all***")
                 self.sell_tokens(token_to_sell=token, amount=token.current_amount_raw)
             elif token.buy_duration_hours >= 240 and abs(token.current_amount - token.buy_amount) < 0.01:
                 logger.info("***Duration Elapsed, Sell all***")
                 self.sell_tokens(token_to_sell=token, amount=token.current_amount_raw)
-            elif token.current_price_per_token_usd >= profit_price_per_token:
+            elif token.current_price_per_token_usd >= token.profit_price_per_token:
                 logger.info("***Profit Price reached***")
-                self.sell_tokens(token_to_sell=token, amount=profit_sell_amount)
-            logger.info("----------------------------Run End----------------------------")
-
-    def get_holdings(self) -> List[HoldingData]:
-        return self.WalletInterface.holdings
+                self.sell_tokens(token_to_sell=token, amount=token.profit_sell_amount)
+        logger.info("----------------------------Run End----------------------------")
 
     def sell_tokens(self, token_to_sell: HoldingData, amount: int):
         """Sell token
@@ -93,21 +62,25 @@ class SplSeller:
             tokens_to_buy (List[]): _description_
         """
         logger.info("Selling token {s}: {t}".format(s=token_to_sell.symbol, t=token_to_sell.name))
+        logger.info(token_to_sell)
+        key_pair = self._get_key_pair(public_key=token_to_sell.public_key)
         try:
-            self.SwapInterface.place_sell_order(INPUT_MINT=token_to_sell.mint, AMOUNT=amount)
+            self.SwapInterface.place_sell_order(INPUT_MINT=token_to_sell.mint, AMOUNT=amount, KEY_PAIR=key_pair)
         except Exception as e:
             logger.error("Error Selling {e}".format(e=e))
 
-    def _get_exit_strategy(self, percent_remaining: float) -> ExitStrategy:
-        for strat in self.EXIT_STRATEGY:
-            if strat["amount_remaining_percent_lte"] >= percent_remaining > strat["amount_remaining_percent_gt"]:
-                return ExitStrategy(
-                    amount_remaining_percent_gt=strat["amount_remaining_percent_gt"],
-                    amount_remaining_percent_lte=strat["amount_remaining_percent_lte"],
-                    stop_price_per_token_percent_change=strat["stop_price_per_token_percent_change"],
-                    profit_price_per_token_percent_change=strat["profit_price_per_token_percent_change"],
-                    profit_sell_amount_percent=strat["profit_sell_amount_percent"],
-                )
+    def _get_key_pair(self, public_key: str) -> Keypair:
+        """_summary_
+
+        Args:
+            public_key (str): _description_
+
+        Returns:
+            KeyPair: _description_
+        """
+        for each in self.wallets:
+            if each.public_key == public_key:
+                return each.key_pair
         return None
 
     def get_sleep_time(self) -> int:
@@ -117,12 +90,10 @@ class SplSeller:
             int: _description_
         """
         number_of_holdings = len(self.WalletInterface.holdings)
-        utc_minute = datetime.now(timezone.utc).minute
-        seconds_to_top_of_hour = (60 - utc_minute) * 60
-        if number_of_holdings == 0 and utc_minute <= 59 and utc_minute >= 25:
-            return seconds_to_top_of_hour
+        if number_of_holdings == 0:
+            return 60
         else:
-            return 8
+            return 10
 
 
 def run_server():
@@ -143,8 +114,6 @@ if __name__ == "__main__":
         try:
             Seller.run()
             seconds_to_sleep = Seller.get_sleep_time()
-            if seconds_to_sleep > 15:
-                logger.info("Sleeping {x} seconds".format(x=seconds_to_sleep))
             time.sleep(seconds_to_sleep)
         except KeyboardInterrupt:
             logger.info("\nStopped by user")

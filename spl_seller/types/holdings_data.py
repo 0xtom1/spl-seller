@@ -35,6 +35,8 @@ class HoldingData:
     exit_strategy: Optional[ExitStrategy] = None
     profit_sell_amount: Optional[int] = None
     profit_price_per_token: Optional[float] = None
+    percent_from_sell: Optional[float] = None
+    last_print_time: Optional[datetime] = None
 
     def __str__(self):
         parts = []
@@ -70,6 +72,8 @@ class HoldingData:
             parts.append(f"\tsell_percent_remaining: {self.sell_percent_remaining*100:.2f}%")
         if self.stop_price_usd is not None:
             parts.append(f"\tstop_price_usd: ${self.stop_price_usd:.10f}")
+        if self.percent_from_sell is not None:
+            parts.append(f"\tpercent_from_sell: {self.percent_from_sell*100:.2f}%")
         if self.exit_strategy:
             parts.append(f"\tprofit_sell_amount: {self.profit_sell_amount}")
             parts.append(f"\tprofit_price_per_token: ${self.profit_price_per_token:.15f}")

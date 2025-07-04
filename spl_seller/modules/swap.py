@@ -15,10 +15,9 @@ logger = get_logger()
 
 
 class Swapper:
-    def __init__(self, WALLET_PRIVATE_KEY: str, HELIUS_API_KEY: str):
+    def __init__(self, HELIUS_API_KEY: str):
         # Configuration
         self.RPC_ENDPOINT = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
-        self.WALLET_PRIVATE_KEY = WALLET_PRIVATE_KEY
         self.sol_mint = "So11111111111111111111111111111111111111112"  # SOL
 
         self.COMMITMENT = "confirmed"  # Commitment level for RPC calls
@@ -31,25 +30,19 @@ class Swapper:
         except Exception as e:
             raise Exception(f"Failed to connect to Helius RPC: {e}")
 
-        # Validate and initialize wallet
-        try:
-            self.wallet = Keypair.from_base58_string(WALLET_PRIVATE_KEY)
-            logger.info(f"Wallet public key: {self.wallet.pubkey()}")
-        except ValueError as e:
-            raise ValueError(f"Invalid private key: {e}")
-
     @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10))
-    def get_balance_with_retry(self):
+    def get_balance_with_retry(self, pubkey):
         """Fetch wallet balance with retry logic."""
         try:
-            return self.client.get_balance(self.wallet.pubkey(), commitment=self.COMMITMENT).value
+            return self.client.get_balance(pubkey, commitment=self.COMMITMENT).value
         except Exception as e:
             raise Exception(f"RPC error during balance check: {e}")
 
-    def place_sell_order(self, INPUT_MINT: str, AMOUNT: int):
+    def place_sell_order(self, INPUT_MINT: str, AMOUNT: int, KEY_PAIR: Keypair):
         """Place a sell order for AMOUNT of INPUT_MINT"""
         try:
             logger.info("----Start Sell----")
+            logger.info(KEY_PAIR.pubkey())
             # Get quote
             quote = self.get_quote(input_mint=INPUT_MINT, output_mint=self.sol_mint, amount=AMOUNT)
             output_sol = float(quote["outAmount"]) / (10**9)
@@ -64,7 +57,7 @@ class Swapper:
                     quote = self.get_quote(input_mint=INPUT_MINT, output_mint=self.sol_mint, amount=sell_amount)
 
                 # Execute swap
-                txid = self.execute_swap(quote=quote, user_public_key=str(self.wallet.pubkey()))
+                txid = self.execute_swap(quote=quote, key_pair=KEY_PAIR)
                 logger.info(f"Sell order successful: https://solscan.io/tx/{txid}")
 
             logger.info("----End Sell----")
@@ -141,11 +134,11 @@ class Swapper:
             raise Exception(f"Failed to create swap: {e}")
 
     @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10))
-    def execute_swap(self, quote: dict, user_public_key: str) -> str:
+    def execute_swap(self, quote: dict, key_pair: Keypair) -> str:
         """Sign and send the swap transaction with priority fee."""
         try:
             # Create swap transaction
-            swap_transaction = self.create_swap(quote=quote, user_public_key=user_public_key)
+            swap_transaction = self.create_swap(quote=quote, user_public_key=str(key_pair.pubkey()))
 
             # Decode the base64 transaction
             transaction_bytes = base64.b64decode(swap_transaction)
@@ -156,7 +149,7 @@ class Swapper:
             logger.info(f"Deserialized transaction instructions: {len(unsigned_tx.message.instructions)}")
 
             # Create and sign the transaction
-            signed_tx = VersionedTransaction(unsigned_tx.message, [self.wallet])
+            signed_tx = VersionedTransaction(unsigned_tx.message, [key_pair])
             logger.info(f"Final transaction instructions: {len(signed_tx.message.instructions)}")
 
             # Send the transaction

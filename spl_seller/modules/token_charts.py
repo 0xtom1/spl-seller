@@ -67,7 +67,7 @@ class TokenCharts:
             logger.error("Returning 160 as default")
             return 160.0
 
-    def get_quotes(self, mints: List[str]) -> dict:
+    def get_quotes(self, mints: List[str], liquidity: int = 100000) -> dict:
         """_summary_
 
         Args:
@@ -80,7 +80,7 @@ class TokenCharts:
             return dict()
 
         comma_separated = ",".join(mints)
-        url = "https://public-api.birdeye.so/defi/multi_price?check_liquidity=100000&include_liquidity=false"
+        url = f"https://public-api.birdeye.so/defi/multi_price?check_liquidity={liquidity}&include_liquidity=false"
 
         payload = {"list_address": comma_separated}
 
@@ -100,10 +100,17 @@ class TokenCharts:
 
         result_dict = dict()
         for key in response_json["data"]:
-            result_dict[key] = {
-                "current_price_per_token_usd": response_json["data"][key]["value"],
-                "current_price_per_token_sol": response_json["data"][key]["priceInNative"],
-            }
+            if (
+                response_json["data"][key] is None
+                or "value" not in response_json["data"][key]
+                or "priceInNative" not in response_json["data"][key]
+            ):
+                continue
+            else:
+                result_dict[key] = {
+                    "current_price_per_token_usd": response_json["data"][key]["value"],
+                    "current_price_per_token_sol": response_json["data"][key]["priceInNative"],
+                }
 
         return result_dict
 
