@@ -23,7 +23,7 @@ def get_logger(name: str = "spl-seller") -> logging.Logger:
 
     # Formatter for console
     console_formatter = logging.Formatter(
-        fmt="%(asctime)s - %(module)s - %(funcName)s - %(message)s",
+        fmt="%(module)s - %(funcName)s - %(message)s",
         # datefmt="%Y-%m-%d %H:%M:%S.%f",  # Use decimal for milliseconds
     )
 

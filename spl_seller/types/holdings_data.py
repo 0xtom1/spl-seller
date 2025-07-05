@@ -87,3 +87,52 @@ class HoldingData:
             )
 
         return "\n".join(parts) or "HoldingData (empty)"
+
+    def __str_medium__(self):
+        parts = []
+        parts.append(f"\nPubKey: {self.public_key}")
+        parts.append(f"Symbol: {self.symbol} - Name: {self.name} - Address: {self.address} - Mint: {self.mint}")
+        parts.append(f"\tcurrent_amount: {self.current_amount:.2f}")
+        if self.current_price_per_token_usd is not None:
+            parts.append(f"\tcurrent_price_per_token_usd: ${self.current_price_per_token_usd:.15f}")
+            parts.append(f"\tcurrent_price_time: {self.current_price_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        if self.current_value_sol is not None:
+            parts.append(f"\tcurrent_value_sol: {self.current_value_sol:.2f}")
+        if self.buy_time:
+            parts.append(f"\tbuy_time: {self.buy_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        if self.buy_duration_hours is not None:
+            parts.append(f"\tbuy_duration_hours: {self.buy_duration_hours}")
+        if self.buy_amount is not None:
+            parts.append(f"\tbuy_amount: {self.buy_amount}")
+        if self.buy_price_per_token_usd is not None:
+            parts.append(f"\tbuy_price_per_token_usd: ${self.buy_price_per_token_usd:.15f}")
+        if self.buy_price_sol_total is not None:
+            parts.append(f"\tbuy_price_sol_total: {self.buy_price_sol_total:.4f}")
+        if self.sell_percent is not None:
+            parts.append(f"\tsell_count: {self.sell_count}")
+            parts.append(f"\tsell_amount_mint: {self.sell_amount_mint:.2f}")
+            parts.append(f"\tsell_amount_sol: {self.sell_amount_sol:.4f}")
+            parts.append(f"\tsell_percent: {self.sell_percent*100:.2f}%")
+            parts.append(f"\tsell_percent_remaining: {self.sell_percent_remaining*100:.2f}%")
+        if self.stop_price_usd is not None:
+            parts.append(f"\tstop_price_usd: ${self.stop_price_usd:.10f}")
+        if self.percent_from_sell is not None:
+            parts.append(f"\tpercent_from_sell: {self.percent_from_sell*100:.2f}%")
+        if self.exit_strategy:
+            parts.append(f"\tprofit_sell_amount: {self.profit_sell_amount}")
+            parts.append(f"\tprofit_price_per_token: ${self.profit_price_per_token:.15f}")
+
+        return "\n".join(parts) or "HoldingData (empty)"
+
+    def __str_short__(self):
+        parts = []
+        if self.public_key is not None:
+            parts.append(f"\n\tpublic_key: {self.public_key}")
+        if self.address is not None:
+            parts.append(f"\taddress: {self.address}")
+        if self.mint is not None:
+            parts.append(f"\tmint: {self.mint}")
+        if self.current_amount_raw is not None:
+            parts.append(f"\tcurrent_amount_raw: {self.current_amount_raw}")
+
+        return "\n".join(parts) or "HoldingData (empty)"

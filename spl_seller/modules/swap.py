@@ -1,9 +1,7 @@
 import base64
-import os
 from time import sleep
 
 import requests
-from dotenv import load_dotenv
 from solana.rpc.api import Client
 from solders.keypair import Keypair
 from solders.transaction import VersionedTransaction
@@ -166,14 +164,4 @@ class Swapper:
 
 
 if __name__ == "__main__":
-    load_dotenv()
-    SOLANA_PRIVATE_KEY = os.environ.get("SOLANA_PRIVATE_KEY")
-    if not SOLANA_PRIVATE_KEY:
-        raise ValueError("SOLANA_PRIVATE_KEY not found in environment variables")
-    HELIUS_API_KEY = os.environ.get("HELIUS_API_KEY")
-    if not HELIUS_API_KEY:
-        raise ValueError("HELIUS_API_KEY not found in environment variables")
-
-    S = Swapper(WALLET_PRIVATE_KEY=SOLANA_PRIVATE_KEY, HELIUS_API_KEY=HELIUS_API_KEY)
-    # a = S.place_buy_order(OUTPUT_MINT="Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk", AMOUNT_IN_SOL=0.1)
-    # S.place_sell_order(INPUT_MINT="Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk", AMOUNT=110319682)
+    pass
