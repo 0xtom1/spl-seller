@@ -33,4 +33,4 @@ jobs:
           --allow-unauthenticated \
           --min-instances 1 \
           --max-instances 1 \
-          --set-env-vars HELIUS_API_KEY=${{ secrets.HELIUS_API_KEY }},BIRDEYE_API_TOKEN=${{ secrets.BIRDEYE_API_TOKEN }},SOLANA_PRIVATE_KEY1=${{ secrets.SOLANA_PRIVATE_KEY1 }},SOLANA_PRIVATE_KEY2=${{ secrets.SOLANA_PRIVATE_KEY2 }},PV_EXIT_INDEX1=${{ secrets.PV_EXIT_INDEX1 }},PV_EXIT_INDEX2=${{ secrets.PV_EXIT_INDEX2 }},MODE=SELLER
+          --set-env-vars HELIUS_API_KEY=${{ secrets.HELIUS_API_KEY }},BIRDEYE_API_TOKEN=${{ secrets.BIRDEYE_API_TOKEN }},SOLANA_PRIVATE_KEY1=${{ secrets.SOLANA_PRIVATE_KEY1 }},SOLANA_PRIVATE_KEY2=${{ secrets.SOLANA_PRIVATE_KEY2 }},SOLANA_PRIVATE_KEY3=${{ secrets.SOLANA_PRIVATE_KEY3 }},PV_EXIT_INDEX1=${{ secrets.PV_EXIT_INDEX1 }},PV_EXIT_INDEX2=${{ secrets.PV_EXIT_INDEX2 }},PV_EXIT_INDEX3=${{ secrets.PV_EXIT_INDEX3 }},MODE=SELLER
