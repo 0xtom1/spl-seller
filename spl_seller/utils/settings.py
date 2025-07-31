@@ -11,6 +11,7 @@ dotenv.load_dotenv()
 
 
 def get_wallet_list() -> List[WalletInfo]:
+    # test line
     private_key_1 = os.environ.get("SOLANA_PRIVATE_KEY1")
     private_key_2 = os.environ.get("SOLANA_PRIVATE_KEY2")
     private_key_3 = os.environ.get("SOLANA_PRIVATE_KEY3")
